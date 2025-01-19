@@ -8,19 +8,31 @@ const SENTIMENT_API_ENDPOINT = import.meta.env.VITE_SENTIMENT_API_ENDPOINT
 
 function App() {
   const [text, setText] = useState('')
-  const [sentiment, setSentiment] = useState<string | null>(null)
+  const [sentimentScore, setSentimentScore] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
 
   const analyzeSentiment = async () => {
     setLoading(true)
     try {
       const response = await axios.post(SENTIMENT_API_ENDPOINT, { text })
-      setSentiment(response.data.sentiment)
+      setSentimentScore(response.data.sentiment) // Expect response in range 0-4
     } catch (error) {
       console.error('Error analyzing sentiment:', error)
-      setSentiment('Error occurred')
+      setSentimentScore(null)
     }
     setLoading(false)
+  }
+
+  const getSentimentColor = (score: number | null) => {
+    if (score === null) return 'text-gray-600'
+    switch (score) {
+      case 0: return 'text-red-600'   // Very Negative
+      case 1: return 'text-orange-500' // Negative
+      case 2: return 'text-gray-600'   // Neutral
+      case 3: return 'text-blue-500'   // Positive
+      case 4: return 'text-green-600'  // Very Positive
+      default: return 'text-gray-600'
+    }
   }
 
   return (
@@ -44,12 +56,12 @@ function App() {
             >
               {loading ? 'Analyzing...' : 'Analyze Sentiment'}
             </Button>
-            {sentiment && (
-              <div className={`text-center font-semibold ${
-                sentiment === 'positive' ? 'text-green-600' : 
-                sentiment === 'negative' ? 'text-red-600' : 'text-gray-600'
-              }`}>
-                Sentiment: {sentiment}
+            {sentimentScore !== null && (
+              <div className={`text-center font-semibold ${getSentimentColor(sentimentScore)}`}>
+                Sentiment: {sentimentScore === 0 ? 'Very Negative' :
+                  sentimentScore === 1 ? 'Negative' :
+                  sentimentScore === 2 ? 'Neutral' :
+                  sentimentScore === 3 ? 'Positive' : 'Very Positive'}
               </div>
             )}
           </div>
@@ -60,4 +72,3 @@ function App() {
 }
 
 export default App
-
