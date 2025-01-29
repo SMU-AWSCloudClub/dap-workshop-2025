@@ -28,8 +28,3 @@ PowerShell
 ```
 pip install -r requirements.txt
 ```
-
-### 4. Download spaCy tokenizer (for RNN & LSTM only)
-```
-python3.11 -m spacy download en_core_web_sm
-```

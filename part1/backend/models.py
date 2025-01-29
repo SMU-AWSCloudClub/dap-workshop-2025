@@ -5,7 +5,6 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from tqdm import tqdm
 from statistics import mean
 import torch
-import spacy
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
@@ -15,11 +14,18 @@ import numpy as np
 # region Dataset
 
 UNKNOWN_TOKEN = "[UNK]"
-SPACY_WEB_CORE = "en_core_web_sm"
+
+def simple_tokenize(text: str):
+    """
+    A simple whitespace-based tokenizer that lowercases the text
+    and splits on whitespace.
+    """
+    return text.lower().split()
+
 class TextDataset(Dataset):
     """
     Accepts the texts, labels, and word_to_idx that come from build_vocab_and_matrix.
-    We utilize spacy for tokenization, then look up each token
+    We utilise a simple whitespace-based tokeniser, then look up each token
     in our word_to_idx; if not found, use [UNK].
     """
 
@@ -27,14 +33,14 @@ class TextDataset(Dataset):
         self.texts = texts
         self.labels = labels
         self.word_to_idx = word_to_idx
+        self.unk_idx = self.word_to_idx[UNKNOWN_TOKEN]
 
     def __len__(self):
         return len(self.texts)
 
     def __getitem__(self, idx):
         text = self.texts[idx]
-        tokens = spacy_tokenize(text)
-        # Map tokens to indices
+        tokens = simple_tokenize(text)
         token_ids = [
             self.word_to_idx.get(t, self.unk_idx)
             for t in tokens
@@ -44,7 +50,6 @@ class TextDataset(Dataset):
 # endregion
 
 # region Embedding Matrix
-
 
 def build_vocab_and_matrix(texts, w2v, emb_dim=300):
     """
@@ -68,18 +73,16 @@ def build_vocab_and_matrix(texts, w2v, emb_dim=300):
     vectors.append(np.zeros(emb_dim))
 
     for text in texts:
-        # Use spaCy for tokenization
-        tokens = spacy_tokenize(text)  
+        tokens = simple_tokenize(text)
         for token in tokens:
-            if token in word_to_idx:  # already added
+            if token in word_to_idx:
                 continue
-            if token in w2v:         # only add if in Word2Vec
+            if token in w2v:  # only add if in Word2Vec
                 word_to_idx[token] = len(idx_to_word)
                 idx_to_word.append(token)
                 vectors.append(w2v[token])
             else:
-                # if not in w2v, map to [UNK] at runtime
-                pass
+                pass  # map to [UNK] at runtime
 
     # Build final embedding matrix
     emb_matrix = np.zeros((len(idx_to_word), emb_dim))
@@ -92,7 +95,6 @@ def build_vocab_and_matrix(texts, w2v, emb_dim=300):
 
 # region Custom RNN
 
-
 class CustomRNN(nn.Module):
     """
     Simple RNN for demonstration (embedding -> RNN -> dropout -> linear) with dynamic token lengths.
@@ -100,44 +102,28 @@ class CustomRNN(nn.Module):
 
     def __init__(self, emb_matrix, hidden_dim=64, num_classes=5, dropout_prob=0.5):
         super().__init__()
-        # Create an embedding layer from the pretrained matrix
         self.embedding = nn.Embedding.from_pretrained(
             torch.FloatTensor(emb_matrix),
-            freeze=False  # Set to True if you don't want to fine-tune embeddings
+            freeze=False
         )
         embedding_dim = emb_matrix.shape[1]
         self.rnn = nn.RNN(embedding_dim, hidden_dim, batch_first=True)
-        self.dropout_in = nn.Dropout(dropout_prob)   # drop at embedding
-        self.dropout_out = nn.Dropout(dropout_prob)  # drop at hidden output
+        self.dropout_in = nn.Dropout(dropout_prob)
+        self.dropout_out = nn.Dropout(dropout_prob)
         self.fc = nn.Linear(hidden_dim, num_classes)
 
     def forward(self, padded_inputs, lengths):
-        """
-        padded_inputs: (batch_size, seq_len) of token IDs
-        lengths: list or tensor of actual sequence lengths in the batch
-        """
-        # Convert each token ID to an embedding
-        embedded = self.embedding(padded_inputs)  # shape: (batch_size, seq_len, embedding_dim)
-
-        # Pack the padded batch so the RNN can ignore padding tokens
+        embedded = self.embedding(padded_inputs)
         packed_inputs = pack_padded_sequence(
             embedded, lengths, batch_first=True, enforce_sorted=False
         )
-
-        # For an RNN, we get (output, hidden)
         _, hidden = self.rnn(packed_inputs)
-
-        # hidden: (num_layers, batch_size, hidden_dim)
-        # Dropout on hidden output
         dropped = self.dropout_out(hidden[-1])
-
         return self.fc(dropped)
-
 
 # endregion
 
 # region Custom LSTM
-
 
 class CustomLSTM(nn.Module):
     """ Simple LSTM for demonstration (embedding -> LSTM -> dropout -> linear). """
@@ -146,7 +132,7 @@ class CustomLSTM(nn.Module):
         super().__init__()
         self.embedding = nn.Embedding.from_pretrained(
             torch.FloatTensor(emb_matrix),
-            freeze=False  # Let the LSTM fine-tune embeddings
+            freeze=False
         )
         embedding_dim = emb_matrix.shape[1]
         self.lstm = nn.LSTM(embedding_dim, hidden_dim, batch_first=True)
@@ -155,29 +141,20 @@ class CustomLSTM(nn.Module):
         self.fc = nn.Linear(hidden_dim, num_classes)
 
     def forward(self, x, lengths):
-        # x is a padded tensor of token indices
-        embedded = self.embedding(x)  # shape: (batch_size, seq_len, embedding_dim)
-        embedded = self.dropout_in(embedded) # Drop out some embeddings
-
+        embedded = self.embedding(x)
+        embedded = self.dropout_in(embedded)
         packed = pack_padded_sequence(
-            embedded, lengths,
-            batch_first=True, enforce_sorted=False
+            embedded, lengths, batch_first=True, enforce_sorted=False
         )
-
         _, (hidden, _) = self.lstm(packed)
-
         dropped = self.dropout_out(hidden[-1])
         return self.fc(dropped)
+
 # endregion
 
 # region Training helpers
 
-
 def train_model(model, dataset, epochs=2, batch_size=2):
-    """
-    Simple training loop with Adam optimizer + weight decay.
-    Shows progress with TQDM.
-    """
     dataloader = DataLoader(
         dataset,
         batch_size,
@@ -185,7 +162,6 @@ def train_model(model, dataset, epochs=2, batch_size=2):
         num_workers=2,
         collate_fn=dynamic_collate_fn
     )
-
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=0.05)
 
@@ -202,68 +178,40 @@ def train_model(model, dataset, epochs=2, batch_size=2):
         print(f"Epoch {epoch} — avg loss={avg_loss:.4f}")
     return model
 
-
-def spacy_tokenize(text: str):
-    """
-    Use spaCy to tokenize the given text.
-    Returns a list of lowercase tokens (excluding spaces/punctuation).
-    """
-    nlp = spacy.load(SPACY_WEB_CORE)
-    doc = nlp(text.lower())
-    # Filter out spaces/punct tokens if desired
-    tokens = [token.text for token in doc if not token.is_space and not token.is_punct]
-    return tokens    
-
 def dynamic_collate_fn(batch):
-    # batch is a list of (tokens_tensor, label_tensor)
-    
-    # Sort by sequence length (descending) for RNN packing
     batch.sort(key=lambda x: x[0].size(0), reverse=True)
     sequences, labels = zip(*batch)
     lengths = [seq.size(0) for seq in sequences]
-    
-    # Pad all sequences to the same length
     padded_sequences = pad_sequence(sequences, batch_first=True, padding_value=0)
     labels = torch.stack(labels)
     return padded_sequences, torch.tensor(lengths), labels
 
-
 def inference(model, text, word_to_idx):
     """
-    Inference example for the custom RNN/LSTM models.
+    Inference example for the custom RNN/LSTM models with the simple tokenizer.
     """
     tokens = [
         word_to_idx[token] if token in word_to_idx else word_to_idx[UNKNOWN_TOKEN]
         for token in text.lower().split()
     ]
-    inputs = torch.tensor(tokens, dtype=torch.long).unsqueeze(
-        0)  # shape (1, seq_len)
+    inputs = torch.tensor(tokens, dtype=torch.long).unsqueeze(0)
     with torch.no_grad():
-        logits = model(inputs)
+        logits = model(inputs, [len(tokens)])
         prediction = torch.argmax(logits, dim=-1).item()
     return prediction
+
 # endregion
 
 # region Hugging Face model
 
-
 def load_huggingface_model():
-    """
-    Loads a pretrained Hugging Face model and tokenizer.
-    """
-    tokenizer = AutoTokenizer.from_pretrained(
-        "nlptown/bert-base-multilingual-uncased-sentiment")
-    model = AutoModelForSequenceClassification.from_pretrained(
-        "nlptown/bert-base-multilingual-uncased-sentiment")
+    tokenizer = AutoTokenizer.from_pretrained("nlptown/bert-base-multilingual-uncased-sentiment")
+    model = AutoModelForSequenceClassification.from_pretrained("nlptown/bert-base-multilingual-uncased-sentiment")
     return tokenizer, model
 
-
 def huggingface_inference(tokenizer, model, text):
-    """
-    Inference example for the Hugging Face model.
-    """
-    inputs = tokenizer(text, return_tensors="pt",
-                       truncation=True, padding=True)
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
     outputs = model(**inputs)
     return torch.argmax(outputs.logits, dim=-1).item()
+
 # endregion
