@@ -51,15 +51,15 @@ def main():
             labels = df["label"].tolist()
 
             dataset = TextDataset(texts, labels, word_to_idx)
-            trained_model = train_model(model, dataset, epochs=4, batch_size=4)
-            torch.save(trained_model.state_dict(), RNN_WEIGHTS)
+            model = train_model(model, dataset, epochs=4, batch_size=4)
+            torch.save(model.state_dict(), RNN_WEIGHTS)
 
             print('Custom RNN model trained successfully.')
 
         # Step 3: Save Model to Pickle
         with open(PICKLE_NAME, "wb") as f:
             pickle.dump({
-                "model": trained_model,
+                "model": model,
                 "word_to_idx": word_to_idx,
                 "emb_matrix": emb_matrix
             }, f)
@@ -89,9 +89,9 @@ def main():
             dataset = TextDataset(texts, labels, word_to_idx)
             model = CustomLSTM(emb_matrix=emb_matrix,
                                hidden_dim=64, num_classes=5)
-            trained_model = train_model(model, dataset, epochs=4, batch_size=4)
+            model = train_model(model, dataset, epochs=4, batch_size=4)
 
-            torch.save(trained_model.state_dict(), LSTM_WEIGHTS)
+            torch.save(model.state_dict(), LSTM_WEIGHTS)
             print("Custom LSTM model trained successfully.")
 
         # Step 3: Save Model to Pickle
