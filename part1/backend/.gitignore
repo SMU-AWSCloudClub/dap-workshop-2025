@@ -171,4 +171,7 @@ cython_debug/
 .pypirc
 
 # Ignore DAP Workhshop's venv
+# Ignore all pickle files & model weights to reduce git size
 dap_workshop/
+*.pkl
+*.pt
