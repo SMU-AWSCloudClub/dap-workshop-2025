@@ -3,6 +3,7 @@ import axios from 'axios'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { log } from 'console'
 
 const SENTIMENT_API_BASE = import.meta.env.VITE_SENTIMENT_API_ENDPOINT;
 const SENTIMENT_API_ENDPOINT = `http://${SENTIMENT_API_BASE}:8000/predict`;
@@ -12,11 +13,18 @@ function App() {
   const [sentimentScore, setSentimentScore] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      analyzeSentiment()
+    }
+  }
+
   const analyzeSentiment = async () => {
     setLoading(true)
     try {
       const response = await axios.post(SENTIMENT_API_ENDPOINT, { text })
-      setSentimentScore(response.data.sentiment) // Expect response in range 0-4
+      setSentimentScore(response.data.prediction) // Expect response in range 0-4
     } catch (error) {
       console.error('Error analyzing sentiment:', error)
       setSentimentScore(null)
@@ -47,6 +55,7 @@ function App() {
             <Textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Enter text to analyze..."
               className="w-full h-32 resize-none"
             />
