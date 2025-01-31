@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import torch
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 PICKLE_NAME = "model.pkl"
 
@@ -28,6 +29,14 @@ def simple_tokenize(text: str, word_to_idx: dict):
     return [word_to_idx.get(t, unk_idx) for t in tokens]
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all HTTP methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 class TextPayload(BaseModel):
     text: str

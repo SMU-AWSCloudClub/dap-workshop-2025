@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-const SENTIMENT_API_ENDPOINT = import.meta.env.VITE_SENTIMENT_API_ENDPOINT
+const SENTIMENT_API_BASE = import.meta.env.VITE_SENTIMENT_API_ENDPOINT;
+const SENTIMENT_API_ENDPOINT = `http://${SENTIMENT_API_BASE}:8000/predict`;
 
 function App() {
   const [text, setText] = useState('')
