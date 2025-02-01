@@ -12,11 +12,18 @@ function App() {
   const [sentimentScore, setSentimentScore] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      analyzeSentiment()
+    }
+  }
+
   const analyzeSentiment = async () => {
     setLoading(true)
     try {
       const response = await axios.post(SENTIMENT_API_ENDPOINT, { text })
-      setSentimentScore(response.data.sentiment) // Expect response in range 0-4
+      setSentimentScore(response.data.prediction) // Expect response in range 0-4
     } catch (error) {
       console.error('Error analyzing sentiment:', error)
       setSentimentScore(null)
@@ -24,17 +31,30 @@ function App() {
     setLoading(false)
   }
 
+  const getSentimentLabel = (score: number) => {
+    switch (score) {
+      case 0: return 'Very Negative'
+      case 1: return 'Negative'
+      case 2: return 'Neutral'
+      case 3: return 'Positive'
+      case 4: return 'Very Positive'
+      default: return 'Neutral'
+    }
+  }
+
   const getSentimentColor = (score: number | null) => {
     if (score === null) return 'text-gray-600'
     switch (score) {
-      case 0: return 'text-red-600'   // Very Negative
-      case 1: return 'text-orange-500' // Negative
-      case 2: return 'text-gray-600'   // Neutral
-      case 3: return 'text-blue-500'   // Positive
-      case 4: return 'text-green-600'  // Very Positive
+      case 0: return 'text-red-700'
+      case 1: return 'text-orange-600'
+      case 2: return 'text-gray-700'
+      case 3: return 'text-sky-500'
+      case 4: return 'text-green-700'
       default: return 'text-gray-600'
     }
   }
+
+  const markerLeft = sentimentScore !== null ? sentimentScore * 25 : 0;
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -47,6 +67,7 @@ function App() {
             <Textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Enter text to analyze..."
               className="w-full h-32 resize-none"
             />
@@ -58,12 +79,38 @@ function App() {
               {loading ? 'Analyzing...' : 'Analyze Sentiment'}
             </Button>
             {sentimentScore !== null && (
-              <div className={`text-center font-semibold ${getSentimentColor(sentimentScore)}`}>
-                Sentiment: {sentimentScore === 0 ? 'Very Negative' :
-                  sentimentScore === 1 ? 'Negative' :
-                  sentimentScore === 2 ? 'Neutral' :
-                  sentimentScore === 3 ? 'Positive' : 'Very Positive'}
-              </div>
+              <>
+                <div className={`text-center font-semibold ${getSentimentColor(sentimentScore)}`}>
+                  Sentiment: {getSentimentLabel(sentimentScore)}
+                </div>
+                {/* Shortened gradient scale and labels container */}
+                <div className="relative mt-6 w-4/5 mx-auto">
+                  {/* Gradient scale bar */}
+                  <div
+                    className="h-2 rounded-full"
+                    style={{
+                      background: 'linear-gradient(to right, #b91c1c, #ea580c, #4b5563, #0ea5e9, #16a34a)'
+                    }}
+                  ></div>
+                  {/* Arrow marker positioned above the bar */}
+                  <div
+                    className="absolute"
+                    style={{ top: '-14px', left: `calc(${markerLeft}% - 8px)` }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className={getSentimentColor(sentimentScore)}
+                    >
+                      {/* Downward-pointing arrow */}
+                      <polygon points="4,6 20,6 12,14" fill="currentColor" />
+                    </svg>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </CardContent>
